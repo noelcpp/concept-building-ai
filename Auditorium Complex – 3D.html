@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Auditorium Complex – 3D</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--fg:#1d2330;--pn:rgba(255,255,255,.92);--bd:#c9ced8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--fg:#e8ebf2;--pn:rgba(24,27,34,.92);--bd:#3a4050}}
+:root[data-theme=dark]{--fg:#e8ebf2;--pn:rgba(24,27,34,.92);--bd:#3a4050}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0;overflow:hidden;background:#9cc7e8;color:var(--fg);font:13px system-ui,sans-serif}
+canvas{position:fixed;inset:0;display:block}
+#p{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:10px;width:214px;max-height:calc(100% - 30px);overflow:auto;background:var(--pn);border:1px solid var(--bd);border-radius:10px;padding:10px;backdrop-filter:blur(6px)}
+#p b{font-size:14px}#p small{display:block;opacity:.7;margin:2px 0 6px}
+#v{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}
+button{font:inherit;color:inherit;background:transparent;border:1px solid var(--bd);border-radius:6px;padding:5px;cursor:pointer}
+button:hover{background:rgba(120,140,180,.2)}
+label{display:block;margin:5px 0}input[type=range]{width:100%;margin:2px 0}
+#t{position:fixed;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));background:var(--pn);border:1px solid var(--bd);border-radius:8px;padding:6px 9px;font-size:12px}
+</style></head><body>
+<div id="p"><b>Auditorium Complex</b><small>Phase 2 · interactive 3D</small><div id="v"></div>
+<label><input type="checkbox" id="r" checked> Roof sheet</label>
+<label><input type="checkbox" id="f" checked> First floor (office + stage)</label>
+<label><input type="checkbox" id="l" checked> Landscape &amp; cars</label>
+<label>Wall transparency<input type="range" id="xr" min="0" max="90" value="0"></label>
+<label>Explode layers (lift roofs &amp; first floor)<input type="range" id="ex" min="0" max="100" value="0"></label>
+<label>Section cut height<input type="range" id="cu" min="0.6" max="9" step="0.1" value="9"></label>
+<label>Sun time (6am–6pm)<input type="range" id="tm" min="6" max="18" step="0.1" value="15"></label>
+<small>Hall 11.44 × 11.28 m<br>Stage 6.40 × 5.16 m</small></div>
+<div id="t">Drag: orbit · Wheel: zoom · Right-drag: pan</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const $=i=>document.getElementById(i),PI=Math.PI,R=Math.random,P=.45;
+const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,.1,500);
+const ren=new THREE.WebGLRenderer({antialias:true});ren.outputEncoding=THREE.sRGBEncoding;
+ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(ren.domElement);
+const cp=new THREE.Plane(new THREE.Vector3(0,-1,0),9);ren.clippingPlanes=[cp];
+const ctl=new THREE.OrbitControls(cam,ren.domElement);ctl.enableDamping=true;ctl.maxPolarAngle=1.55;
+
+/* ---------- procedural textures ---------- */
+const mk=(f,s=256)=>{const c=document.createElement('canvas');c.width=c.height=s;f(c.getContext('2d'),s);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;t.encoding=THREE.sRGBEncoding;return t};
+const nz=(x,s,n,a,z=2)=>{for(let i=0;i<n;i++){const v=R()<.5?0:255;x.fillStyle=`rgba(${v},${v},${v},${a*R()})`;x.fillRect(R()*s,R()*s,z,z)}};
+const tPaint=mk((x,s)=>{x.fillStyle='#f3f1ea';x.fillRect(0,0,s,s);nz(x,s,9000,.07)});
+const tGrass=mk((x,s)=>{x.fillStyle='#4d7a30';x.fillRect(0,0,s,s);for(let i=0;i<6000;i++){x.strokeStyle=`hsl(${80+R()*35},${40+R()*25}%,${22+R()*22}%)`;const a=R()*s,b=R()*s;x.beginPath();x.moveTo(a,b);x.lineTo(a+R()*5-2.5,b-3-R()*5);x.stroke()}});
+const tTile=mk((x,s)=>{x.fillStyle='#dedad2';x.fillRect(0,0,s,s);nz(x,s,3000,.06);x.fillStyle='#a9a69f';for(let i=0;i<2;i++){x.fillRect(i*s/2,0,3,s);x.fillRect(0,i*s/2,s,3)}});
+const tWood=mk((x,s)=>{for(let i=0;i<8;i++){x.fillStyle=`hsl(25,${40+R()*12}%,${26+R()*12}%)`;x.fillRect(i*32,0,31,s)}nz(x,s,4000,.12,3);x.fillStyle='#2a170a';for(let i=0;i<8;i++)x.fillRect(i*32+31,0,1,s)});
+const tRoof=mk((x,s)=>{for(let i=0;i<s;i++){x.fillStyle=`hsl(212,14%,${46+14*Math.sin(i/s*PI*32)}%)`;x.fillRect(i,0,1,s)}nz(x,s,2500,.08)});
+const tPaver=mk((x,s)=>{x.fillStyle='#6f6c66';x.fillRect(0,0,s,s);for(let i=0;i<4;i++)for(let j=0;j<4;j++){x.fillStyle=`hsl(30,4%,${52+R()*14}%)`;x.fillRect(i*64+2,j*64+2,60,60)}});
+const tGrav=mk((x,s)=>{x.fillStyle='#8e8b83';x.fillRect(0,0,s,s);nz(x,s,14000,.6)});
+const M=o=>new THREE.MeshStandardMaterial(o);
+const paint=M({map:tPaint,roughness:.9}),tile=M({map:tTile,roughness:.35}),wood=M({map:tWood,roughness:.6}),roofM=M({map:tRoof,roughness:.45,metalness:.35}),
+paver=M({map:tPaver,roughness:.95}),grav=M({map:tGrav,roughness:1}),frame=M({color:0x30343b,roughness:.5,metalness:.6}),doorM=M({color:0x6a4327,roughness:.6}),
+curt=M({color:0x7a1426,roughness:.9}),tim=M({color:0x5b4030,roughness:.8}),grey=M({color:0x85888e,roughness:.8}),
+glass=new THREE.MeshPhysicalMaterial({color:0xa6d4ea,transparent:true,opacity:.38,roughness:.05,metalness:.2});
+
+/* ---------- helpers ---------- */
+const gRoof=new THREE.Group(),gF=new THREE.Group(),gTop=new THREE.Group(),gP=new THREE.Group(),gL=new THREE.Group();scene.add(gRoof,gF,gTop,gP,gL);
+function B(x0,y0,z0,x1,y1,z1,m,g){const w=x1-x0,h=y1-y0,d=z1-z0,G=new THREE.BoxGeometry(w,h,d),u=G.attributes.uv,S=[[d,h],[d,h],[w,d],[w,d],[w,h],[w,h]];
+ for(let i=0;i<24;i++){const s=S[i>>2];u.setXY(i,u.getX(i)*s[0]/2,u.getY(i)*s[1]/2)}
+ const o=new THREE.Mesh(G,m);o.position.set((x0+x1)/2,(y0+y1)/2,(z0+z1)/2);o.castShadow=m!==glass;o.receiveShadow=true;(g||scene).add(o);return o}
+function W(ax,c,u0,u1,y0,y1,ops,out,g){ /* wall along axis ax at fixed coord c, with openings [a,b,ya,yb,'w'|'d'|'o'] */
+ const t=.2,s=(a,b,ya,yb)=>{if(b-a>.001&&yb-ya>.001)ax=='x'?B(a,ya,c-t/2,b,yb,c+t/2,paint,g):B(c-t/2,ya,a,c+t/2,yb,b,paint,g)};
+ const Q=(a,ya,b,yb,o,th,m)=>ax=='x'?B(a,ya,c+o-th/2,b,yb,c+o+th/2,m,g):B(c+o-th/2,ya,a,c+o+th/2,yb,b,m,g);
+ let cur=u0;ops.sort((p,q)=>p[0]-q[0]);
+ for(const [a,b,ya,yb,k] of ops){s(cur,a,y0,y1);s(a,b,y0,ya);s(a,b,yb,y1);cur=b;if(k=='o')continue;const m=(a+b)/2;
+  if(k=='w'){Q(a,ya,b,yb,0,.04,glass);Q(a,ya,b,ya+.05,0,.09,frame);Q(a,yb-.05,b,yb,0,.09,frame);Q(a,ya,a+.05,yb,0,.09,frame);Q(b-.05,ya,b,yb,0,.09,frame);Q(m-.025,ya,m+.025,yb,0,.09,frame);
+   Q(a-.06,ya-.05,b+.06,ya,out*.1,.3,paint);Q(a-.15,yb+.05,b+.15,yb+.1,out*.35,.7,paint)}   /* sill + sunshade */
+  else{Q(a,ya,m-.01,yb,0,.07,doorM);Q(m+.01,ya,b,yb,0,.07,doorM);Q(a-.2,yb+.05,b+.2,yb+.1,out*.5,1,paint)}}
+ s(cur,u1,y0,y1)}
+function bm(x,z0,y0,z1,y1,w,m,g){const o=new THREE.Mesh(new THREE.BoxGeometry(w,w,Math.hypot(z1-z0,y1-y0)),m);o.position.set(x,(y0+y1)/2,(z0+z1)/2);o.rotation.x=-Math.atan2(y1-y0,z1-z0);o.castShadow=true;(g||scene).add(o)}
+
+/* ---------- land (from site plan) ---------- */
+const L=[[-2.12,-8.9],[15,-8.38],[12.4,16.4],[3.96,16.6],[3.44,29.5],[-5.58,31.8],[-5.54,16.6],[-3.29,-3.56],[-2.46,-3.56]];
+tGrass.repeat.set(.25,.25);
+const land=new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(L.map(([x,z])=>new THREE.Vector2(x,-z)))),M({map:tGrass,roughness:1}));land.rotation.x=-PI/2;land.receiveShadow=true;scene.add(land);
+const g2=tGrass.clone();g2.needsUpdate=true;g2.repeat.set(40,40);
+const out=new THREE.Mesh(new THREE.PlaneGeometry(300,300),M({map:g2,color:0xb9c9a8,roughness:1}));out.rotation.x=-PI/2;out.position.y=-.05;out.receiveShadow=true;scene.add(out);
+L.forEach((p,i)=>{const q=L[(i+1)%L.length],dx=q[0]-p[0],dz=q[1]-p[1],o=new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(dx,dz),.9,.15),paint);
+ o.position.set((p[0]+q[0])/2,.45,(p[1]+q[1])/2);o.rotation.y=-Math.atan2(dz,dx);o.castShadow=o.receiveShadow=true;gL.add(o)});
+B(-.5,0,11.3,12.2,.03,16.2,paver);B(.8,0,17,3.4,.03,29,grav);B(-3.8,0,6.2,-2.3,.03,8.9,paver);   /* apron, parking, unloading bay */
+const trG=new THREE.CylinderGeometry(.12,.18,1.8,6),fG=new THREE.IcosahedronGeometry(1,1),trM=M({color:0x5a3d28}),fM=[0x2f6b2a,0x3e7d32,0x4a8a38].map(c=>M({color:c,roughness:1,flatShading:true}));
+function tree(x,z,s){const g=new THREE.Group(),t=new THREE.Mesh(trG,trM),f=new THREE.Mesh(fG,fM[(R()*3)|0]);t.position.y=.9*s;t.scale.setScalar(s);f.position.y=2.6*s;f.scale.set(1.3*s,1.5*s,1.3*s);t.castShadow=f.castShadow=true;g.add(t,f);g.position.set(x,0,z);gL.add(g)}
+for(let z=17.5;z<31;z+=1.05)tree(-4.9,z,.8+R()*.4);
+[[-9,0],[-10,9],[-9,21],[19,-3],[19,9],[17,24],[8,-13],[-1,-13],[-8,35],[9,37],[-14,28],[22,16]].forEach(([x,z])=>tree(x,z,1.3+R()*.5));
+function car(x,z,r,c){const g=new THREE.Group(),cm=M({color:c,roughness:.3,metalness:.5});B(-.85,.25,-2,.85,.9,2,cm,g);B(-.75,.9,-1,.75,1.4,1,M({color:0x1c2530,roughness:.2}),g);
+ [[-.9,-1.3],[.7,-1.3],[-.9,1.1],[.7,1.1]].forEach(([a,b])=>B(a,0,b,a+.2,.5,b+.4,frame,g));g.position.set(x,0,z);g.rotation.y=r;gL.add(g)}
+[[2.3,18.2,0,0xb02a2a],[2.3,22.9,0,0x2a4f9a],[2.3,27.2,0,0xd8d8d8],[10,13,PI/2,0x333a44],[10,15.3,PI/2,0xc9a227]].forEach(a=>car(...a));
+
+/* ---------- building (units: metres, floor level P, x east, z south) ---------- */
+B(-.1,0,-2.6,11.54,P,11.38,paint);B(-1.7,0,-7.86,10.1,P,-2.4,paint);                       /* plinths */
+B(.1,P,.1,11.34,P+.02,11.18,tile);B(0,P,-2.4,11.44,P+.02,.1,tile);B(.2,P,-7.66,3.3,P+.02,-2.5,tile);B(-1.4,P,-7.66,0,P+.02,-5.86,tile);
+B(3.6,P,-7.66,9.8,.95,-2.5,wood);B(4.0,.95,-7.55,9.4,3.4,-7.5,curt);                     /* stage (raised 0.5 m) + curtain */
+const winH=[[.7,2.1,1.3,3.1,'w'],[2.9,4.8,P,3.1,'d'],[5.1,7,1.3,3.1,'w'],[8,9.6,1.3,3.1,'w']];
+W('z',.1,0,11.28,P,3.8,winH,-1);W('z',11.34,0,11.28,P,3.8,winH,1);                           /* hall side walls: windows, double doors */
+W('x',.1,0,11.44,P,4.1,[[3.8,9.4,.95,3.4,'o']],-1);W('z',.1,-2.4,.1,P,3.8,[[-1.9,-.8,P,3,'d']],-1);W('z',11.34,-2.4,.1,P,3.8,[[-1.7,-.8,1.3,3.1,'w']],1);                                        /* hall north wall + opening to stage */
+W('x',11.18,0,11.44,P,5.14,[[5,6.9,P,3,'d'],[1,2.8,1.3,3.1,'w'],[8.2,10,1.3,3.1,'w']],1);     /* main entrance */
+for(const x of[3.4,9.8])for(const z of[.1,3.8,7.5,11.18])B(x-.15,P,z-.15,x+.15,3.87+(z+2.4)*.0922,z+.15,paint);  /* columns */
+[0,1].forEach(i=>{const s=new THREE.Shape([new THREE.Vector2(-2.4,3.8),new THREE.Vector2(11.38,3.8),new THREE.Vector2(11.38,5.14),new THREE.Vector2(-2.4,3.88)]),o=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:.2,bevelEnabled:false}),paint);
+ o.rotation.y=-PI/2;o.position.x=i?11.44:.2;o.castShadow=o.receiveShadow=true;gRoof.add(o)});   /* gable ends */
+/* roofing sheet (hall + corridor) */
+const sl=Math.hypot(14.1,1.3),ang=Math.atan2(1.3,14.1);
+{const g=new THREE.Group();B(-6.02,-.03,-sl/2,6.02,.03,sl/2,roofM,g);g.position.set(5.72,4.55,4.65);g.rotation.x=-ang;gRoof.add(g)}
+
+   /* office + stage share the concrete first-floor roof slab */
+for(const x of[.8,3.2,5.6,8,10.4]){bm(x,-1.8,3.86,11.2,5.05,.1,tim,gRoof)}  /* trusses */
+/* entrance steps, side-door pads */
+B(4.4,0,11.38,7.5,.15,12.45,paint);B(4.5,0,11.38,7.4,.3,12.15,paint);B(4.6,0,11.38,7.3,P,11.85,paint);B(-1,0,2.7,0,.3,5,paint);B(11.44,0,2.7,12.5,.3,5,paint);
+/* chairs */
+{const cs=[];for(let j=0;j<9;j++)for(let i=0;i<18;i++){const x=1+i*.56;if(Math.abs(x-5.7)>.45&&!(x>9.5&&j>5))cs.push([x,3+j*.85])}
+ const cm=M({color:0x7a1f2b,roughness:.8}),a=new THREE.InstancedMesh(new THREE.BoxGeometry(.46,.08,.44),cm,cs.length),b=new THREE.InstancedMesh(new THREE.BoxGeometry(.46,.5,.06),cm,cs.length),m4=new THREE.Matrix4();
+ cs.forEach(([x,z],i)=>{a.setMatrixAt(i,m4.makeTranslation(x,P+.45,z));b.setMatrixAt(i,m4.makeTranslation(x,P+.72,z+.2))});a.castShadow=b.castShadow=true;scene.add(a,b)}
+/* office + stage house (ground floor) */
+W('z',.1,-7.76,-2.4,P,3.65,[[-3.8,-2.9,P,2.6,'d'],[-6.6,-5.3,1.3,2.7,'w']],-1);
+W('x',-7.66,0,3.4,P,3.65,[[.6,2.8,1.3,2.7,'w']],-1);W('x',-2.5,0,3.4,P,3.65,[[.7,2.7,1.3,2.7,'w']],1);
+W('z',3.5,-7.76,-2.4,P,3.65,[],1);
+W('x',-7.66,3.4,10,P,3.65,[],-1);W('z',9.9,-7.76,-2.4,P,3.65,[[-3.7,-2.8,P,2.6,'d']],1);B(10.1,0,-3.9,11,.3,-2.5,paint);
+W('x',-2.5,3.4,10,P,3.65,[[4.2,9.2,.95,3.4,'o']],1);                                      /* stage proscenium opening */
+/* handicapped toilet + landing */
+W('x',-7.66,-1.6,0,P,3.65,[[-1.2,-.5,2.3,3.2,'w']],-1);W('x',-5.86,-1.6,0,P,3.65,[[-1.35,-.55,P,2.6,'d']],1);W('z',-1.5,-7.76,-5.76,P,3.65,[],-1);
+/* first floor over office only (no floor above stage) */
+B(0,3.65,-7.76,10,3.85,-2.4,paint);B(.2,3.85,-7.66,9.8,3.87,-2.5,tile);
+W('z',.1,-7.76,-2.4,3.85,6.85,[[-7.4,-5.5,3.85,6,'o'],[-4.8,-3.7,4.9,6,'w']],-1,gF);
+W('x',-7.66,0,10,3.85,6.85,[[1.8,3.2,4.9,6,'w'],[4,5.4,4.9,6,'w'],[7,8.2,4.9,6,'w'],[8.95,9.65,4.9,6,'w']],-1,gF);W('x',-2.5,0,10,3.85,6.85,[[1.4,2.8,4.9,6,'w'],[3.9,5.7,4.9,6,'w'],[7.7,9.3,4.9,6,'w']],1,gF);W('z',9.9,-7.76,-2.4,3.85,6.85,[[-6.4,-5,4.9,6,'w'],[-4.2,-3,4.9,6,'w']],1,gF);
+W('x',-5.2,.1,3.3,3.85,6.85,[[2.2,3.2,3.85,5.8,'o']],1,gP);W('z',3.3,-5.2,-2.5,3.85,6.85,[[-4.5,-3,3.85,5.8,'o']],1,gP);W('z',6.4,-7.66,-2.5,3.85,6.85,[[-4.6,-3.6,3.85,5.8,'o']],1,gP);W('x',-6.1,6.5,8.8,3.85,6.85,[[7.3,8.1,3.85,5.8,'o']],1,gP);W('z',8.8,-7.66,-6.1,3.85,6.85,[],1,gP);W('z',1.5,-7.66,-5.3,3.85,6.85,[[-6.5,-5.6,3.85,5.9,'d']],-1,gP);B(-.35,6.85,-8.1,10.35,7.05,-2.1,paint,gTop);
+/* left-most stair (1.2 m) to first floor; right-hand access ramp (1.2 m) into the office varandah */
+for(let i=0;i<22;i++)B(-2.4,0,2.7-(i+1)*.27,-1.2,(i+1)*3.85/22,2.7-i*.27,paint);
+{const s=new THREE.Shape([new THREE.Vector2(2.4,0),new THREE.Vector2(-2.4,0),new THREE.Vector2(-2.4,P)]),o=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:1.2,bevelEnabled:false}),paint);o.rotation.y=-PI/2;o.castShadow=o.receiveShadow=true;scene.add(o)}
+B(-2.15,3.65,-7.86,0,3.85,-3.24,paint);B(-2.15,3.85,-7.86,-1.95,4.75,-3.24,paint);B(-1.2,3.85,-3.34,0,4.75,-3.24,paint);B(-2.15,0,-3.5,-1.95,3.65,-3.3,paint);B(-2.15,0,-5.6,-1.95,3.65,-5.4,paint);
+bm(-2.3,-3.24,4.75,2.7,.9,.07,grey);bm(-1.25,-3.24,4.75,2.7,.9,.07,grey);
+
+/* ---------- minimal furniture & fixtures ---------- */
+const cer=M({color:0xffffff,roughness:.2}),chM=M({color:0x3d4a5c,roughness:.7}),cabM=M({color:0xc9b48e,roughness:.7}),sofaM=M({color:0x56708a,roughness:.9}),bedM=M({color:0xece6da,roughness:.9}),blk=M({color:0x1e2024,roughness:.5}),blue=M({color:0x4a6fa5,roughness:.9});
+const ch=(x,z,y,d,g)=>{B(x-.2,y+.42,z-.2,x+.2,y+.47,z+.2,chM,g);B(x-.2,y+.47,Math.min(z+d*.15,z+d*.2),x+.2,y+.95,Math.max(z+d*.15,z+d*.2),chM,g);B(x-.03,y,z-.03,x+.03,y+.42,z+.03,frame,g)};
+const wc=(x,z,y,g)=>{B(x-.2,y,z-.3,x+.2,y+.4,z+.3,cer,g);B(x-.17,y+.4,z-.3,x+.17,y+.85,z-.12,cer,g)};
+const sk=(x,z,y,g)=>{B(x-.25,y+.8,z-.2,x+.25,y+.88,z+.2,cer,g);B(x-.04,y,z-.04,x+.04,y+.8,z+.04,cer,g)};
+W('x',-6.36,.1,3.4,P,3.65,[[.4,1.5,P,2.5,'o'],[2,2.9,P,2.5,'o']],1);W('z',1.75,-7.66,-6.46,P,3.65,[],1);   /* office toilet + wash */
+W('z',9.9,7.9,11.18,P,3,[[8.3,9.1,P,2.3,'o'],[9.95,10.75,P,2.3,'o']],1);W('x',7.9,9.9,11.34,P,3,[],1);W('x',9.5,9.9,11.34,P,3,[],1);   /* hall toilets */
+wc(2.5,-7.2,P);sk(.9,-7.15,P);wc(-1,-7.2,P);sk(-.35,-7.1,P);B(-1.4,P+.8,-6.9,-1.35,P+.85,-6.2,frame);wc(10.6,8.35,P);wc(10.6,9.95,P);
+B(1,P+.7,-5.6,2.6,P+.75,-4.9,wood);B(1.05,P,-5.55,1.15,P+.7,-4.95,wood);B(2.45,P,-5.55,2.55,P+.7,-4.95,wood);ch(1.8,-6,P,-1);ch(1.8,-4.5,P,1);B(.25,P,-6,.7,P+1.7,-5,cabM);   /* office */
+B(5.9,.95,-4.9,6.5,1.95,-4.4,wood);ch(8,-6,.95,-1);ch(8.8,-6,.95,-1);   /* stage: lectern + chairs */
+const F=(a,b,c,d,e,f,m)=>B(a,b,c,d,e,f,m,gP),Y=3.87;   /* first floor furniture (stays when layers lift) */
+F(.2,Y,-5,.8,4.77,-3.4,cabM);F(.2,4.77,-5,.8,4.82,-3.4,blk);F(.8,Y,-5,2,4.77,-4.4,cabM);F(.8,4.77,-5,2,4.82,-4.4,blk);F(.3,4.82,-4.8,.7,4.86,-4.3,frame);F(.3,4.82,-4,.7,4.84,-3.6,grey);F(.25,Y,-3.3,.9,5.65,-2.7,cer);
+F(1.7,Y,-7.45,3.9,4.3,-6.75,sofaM);F(1.7,4.3,-7.5,3.9,4.85,-7.3,sofaM);F(2.3,Y,-6.2,3.3,4.3,-5.7,wood);
+F(4,4.5,-4.8,5.6,4.56,-3.6,wood);for(const x of[4.05,5.5])for(const z of[-4.75,-3.65])F(x,Y,z,x+.06,4.5,z+.06,wood);for(const x of[4.4,5.2]){ch(x,-5.1,Y,-1,gP);ch(x,-3.3,Y,1,gP)}
+F(8,Y,-5.9,9.5,4.3,-4,bedM);F(8,4.3,-5,9.5,4.36,-4,blue);F(8,4.3,-5.95,9.5,4.95,-5.85,wood);F(6.55,Y,-3.3,7.55,5.9,-2.6,cabM);
+wc(7.6,-7.2,Y,gP);sk(6.9,-7.1,Y,gP);
+/* ---------- lights ---------- */
+const hemi=new THREE.HemisphereLight(0xcfe4ff,0x6b6a55,.6),sun=new THREE.DirectionalLight(0xfff1dc,1.1);
+sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);const sc=sun.shadow.camera;sc.left=sc.bottom=-32;sc.right=sc.top=32;sc.near=1;sc.far=150;sun.shadow.bias=-.0004;sun.shadow.normalBias=.04;sun.target.position.set(5,0,5);
+scene.add(hemi,sun,sun.target,new THREE.AmbientLight(0xffffff,.25));
+[[5.7,4.3,5.6,.55],[6.7,3.1,-5,.5],[1.7,3,-5,.4],[5,6,-5,.5]].forEach(([x,y,z,i])=>{const l=new THREE.PointLight(0xffefd0,i,16);l.position.set(x,y,z);scene.add(l)});
+function sunT(h){const a=(h-6)/12*PI,s=Math.sin(a);sun.position.set(5+Math.cos(a)*45,s*40+3,27);sun.intensity=.3+s*.9;hemi.intensity=.3+s*.35;const c=new THREE.Color().setHSL(.58,.5,.5+.2*s);scene.background=c;scene.fog=new THREE.Fog(c,90,280)}
+
+/* ---------- UI ---------- */
+const V={Aerial:[[-16,18,34],[5,2,3]],Front:[[6,3.5,32],[6,3,0]],'Inside hall':[[5.7,2.1,10.3],[5.7,2.4,0],1],Stage:[[6.5,2.6,-4.2],[5.7,1.9,8],1],'Rear / office':[[10,8,-22],[3,3,-4]],'Plan view':[[5.7,42,5.9],[5.7,0,5.5]],'Stair & ramp':[[-8,4.5,9],[-1.2,1.5,-1.5]]};
+let tw=null;
+function go(n){const [p,t,fp]=V[n],p1=new THREE.Vector3(...p),t1=new THREE.Vector3(...t);if(fp)t1.sub(p1).normalize().multiplyScalar(.5).add(p1);
+ tw={p0:cam.position.clone(),t0:ctl.target.clone(),p1,t1,k:0};ctl.rotateSpeed=fp?-.45:.8;ctl.minDistance=fp?.05:2}
+Object.keys(V).forEach(n=>{const b=document.createElement('button');b.textContent=n;b.onclick=()=>go(n);$('v').appendChild(b)});
+$('r').onchange=e=>gRoof.visible=e.target.checked;$('f').onchange=e=>gF.visible=gTop.visible=gP.visible=e.target.checked;$('l').onchange=e=>gL.visible=e.target.checked;
+$('xr').oninput=e=>{const v=1-e.target.value/100;paint.transparent=v<1;paint.opacity=v;paint.depthWrite=v>=1;paint.needsUpdate=true};
+$('ex').oninput=e=>{const k=e.target.value/100;gRoof.position.y=6*k;gF.position.y=4*k;gTop.position.y=8*k};$('cu').oninput=e=>cp.constant=+e.target.value;$('tm').oninput=e=>sunT(+e.target.value);
+function rs(){ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}
+addEventListener('resize',rs);rs();sunT(15);cam.position.set(-16,18,34);ctl.target.set(5,2,3);
+let last=performance.now();
+(function loop(now){requestAnimationFrame(loop);const dt=Math.min((now-last)/1000,.1);last=now;
+ if(tw){tw.k=Math.min(1,tw.k+dt*1.2);const e=tw.k*tw.k*(3-2*tw.k);cam.position.lerpVectors(tw.p0,tw.p1,e);ctl.target.lerpVectors(tw.t0,tw.t1,e);if(tw.k>=1)tw=null}
+ ctl.update();ren.render(scene,cam)})(performance.now());
+</script></body></html>
