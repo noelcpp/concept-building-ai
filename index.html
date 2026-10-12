@@ -8,13 +8,13 @@
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 html,body{height:100%;margin:0;overflow:hidden;background:#9cc7e8;color:var(--fg);font:13px system-ui,sans-serif}
 canvas{position:fixed;inset:0;display:block}
-#p{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:10px;width:214px;max-height:calc(100% - 30px);overflow:auto;background:var(--pn);border:1px solid var(--bd);border-radius:10px;padding:10px;backdrop-filter:blur(6px)}
+#p{z-index:5;position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:10px;width:214px;max-height:calc(100% - 30px);overflow:auto;background:var(--pn);border:1px solid var(--bd);border-radius:10px;padding:10px;backdrop-filter:blur(6px)}
 #p b{font-size:14px}#p small{display:block;opacity:.7;margin:2px 0 6px}
 #v{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}
 button{font:inherit;color:inherit;background:transparent;border:1px solid var(--bd);border-radius:6px;padding:5px;cursor:pointer}
 button:hover{background:rgba(120,140,180,.2)}
 label{display:block;margin:5px 0}input[type=range]{width:100%;margin:2px 0}
-#t{position:fixed;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));background:var(--pn);border:1px solid var(--bd);border-radius:8px;padding:6px 9px;font-size:12px}
+#t{z-index:5;position:fixed;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));background:var(--pn);border:1px solid var(--bd);border-radius:8px;padding:6px 9px;font-size:12px}
 </style></head><body>
 <div id="p"><b>Auditorium Complex</b><small>Phase 2 · interactive 3D</small><div id="v"></div>
 <label><input type="checkbox" id="r" checked> Roof sheet</label>
